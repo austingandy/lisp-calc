@@ -1,3 +1,4 @@
+#!/usr/bin/env ruby
 def calc(line)
   if (!valid?(line))
     "Please ensure your parentheses match."
@@ -7,30 +8,40 @@ def calc(line)
 end
 
 def eval(tokens)
+  comparators = {'>' => :>, '>=' => :>=, '<' => :<, '<=' => :<=, '==' => :==}
   symbols = {
     '+' => lambda{|x| x.inject(0){|sum,x| sum + x}},
     '-' => lambda{|x| x[1..x.length - 1].inject(x[0]){|diff,x| diff - x}},
     '*' => lambda{|x| x.inject(1){|prod,x| prod * x}},
-    '/' => lambda{|x| x[1..x.length-1].inject(x[0]){|divisor,x| divisor / x}}
+    '/' => lambda{|x| x[1..x.length-1].inject(x[0]){|divisor,x| divisor / x}},
+    'car' => lambda{|x| x[0]},
+    'cdr' => lambda{|x| x[1..x.length]}
   }
-  if (symbols.keys.include? tokens[0])
-    args = tokens[1..tokens.length].map{|token| eval(token)}
-    if (args)
-      symbols[tokens[0]].call args
-    end
-  else
-    begin
-      tokens.to_i
-    rescue NoMethodError
-      nil
+  comparators.each do |k,v|
+    symbols[k] = lambda{|x| x.first.send(v,x[1])}
+  end
+  begin
+    tokens.to_i
+  rescue NoMethodError
+    if (symbols.keys.include? tokens.first)
+      args = tokens[1..tokens.length].map{|token| eval(token)}
+      if (args)
+        symbols[tokens[0]].call args
+      end
+    elsif (tokens.first == 'if')
+      tokens.shift
+      condition, consequence, alt = tokens
+      eval(condition) ? eval(consequence) : eval(alt)
+    else
+      tokens.map{|x| eval(x)}
     end
   end
 end
 
 def repl
   while (true)
-    print "calc> "
-    puts eval(parse(tokenize(gets)))
+    print 'rcalc> '
+    puts eval(parse(tokenize(gets))).to_s
   end
 end
 
@@ -59,7 +70,7 @@ def tokenize(line)
 end
 
 def parse(line)
-  rtn = parse_helper(line, nil)
+  rtn = parse_helper(line, [])
   rtn.nil? ? [] : rtn
 end
 
@@ -76,11 +87,13 @@ def parse_helper(line, so_far)
       rtn << line[curr]
       curr += 1
     end
-    if (so_far)
+    if (so_far.length > 0)
       so_far << rtn
+    else
+      so_far = rtn
     end
     line.shift curr
-    parse_helper(line, rtn).compact
+    parse_helper(line, so_far).compact
   end
 end
 
